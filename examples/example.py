@@ -1,4 +1,4 @@
-from async_flow import Task, Sequence, Parallel, CircuitGroup, event_bus, TaskState
+from async_orch import Task, Sequence, Parallel, CircuitGroup, event_bus, TaskState
 import asyncio
 
 # Subscribe a simple logger to event bus
@@ -39,7 +39,7 @@ def flaky_task():
 task_flaky = Task(flaky_task, name="Flaky")
 # Monkey-patch retry policy
 import backoff
-from async_flow import TaskState # Corrected import
+from async_orch import TaskState # Corrected import
 def retry_policy(fn_to_wrap, task_instance): # Added task_instance for better event emitting
     async def on_backoff_handler(details):
         await event_bus.emit({

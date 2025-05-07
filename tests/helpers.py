@@ -1,10 +1,10 @@
 import asyncio
 import random
 import backoff
-from async_flow import Task, Sequence, Parallel, CircuitGroup, event_bus as global_event_bus, TaskState
+from async_orch import Task, Sequence, Parallel, CircuitGroup, event_bus as global_event_bus, TaskState
 
 # --- Event Bus and Logging (Test-Friendly) --------------------------------
-# Provide the global event_bus instance from async_flow
+# Provide the global event_bus instance from async_orch
 event_bus = global_event_bus
 
 async def log_event_for_test(event, log_list=None):

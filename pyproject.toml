@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "async-flow"
+name = "async_orch"
 version = "0.1.0"
 authors = [
   { name="Chakshu", email="chaks.gautam@gmail.com" },
 ]
-description = "async-flow is a Python library designed for building and managing asynchronous task pipelines."
+description = "async_orch is a Python library designed for building and managing asynchronous task pipelines."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file="LICENSE" }
@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/ChakshuGautam/async-flow"
-"Bug Tracker" = "https://github.com/ChakshuGautam/async-flow/issues"
-"Documentation" = "https://github.com/ChakshuGautam/async-flow/blob/main/docs/wiki.md"
+"Homepage" = "https://github.com/ChakshuGautam/async_orch"
+"Bug Tracker" = "https://github.com/ChakshuGautam/async_orch/issues"
+"Documentation" = "https://github.com/ChakshuGautam/async_orch/blob/main/docs/wiki.md"
 
 [project.optional-dependencies]
 test = [

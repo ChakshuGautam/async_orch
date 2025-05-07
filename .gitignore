@@ -99,5 +99,7 @@ venv.bak/
 .DS_Store
 
 .venv/
-async_flow.egg-info/
+async_orch.egg-info/
 .pytest_cache/
+
+.pypirc

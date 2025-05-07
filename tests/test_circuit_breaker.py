@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import MagicMock, patch
 import sys
 
-from async_flow import Task, CircuitGroup, CircuitBreakerError
+from async_orch import Task, CircuitGroup, CircuitBreakerError
 from tests.helpers import fetch_data, process_data # Using helpers' fetch_data
 
 @pytest.mark.asyncio

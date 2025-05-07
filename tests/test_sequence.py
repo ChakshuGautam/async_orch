@@ -1,5 +1,5 @@
 import pytest
-from async_flow import Task, Sequence, Parallel
+from async_orch import Task, Sequence, Parallel
 from tests.helpers import fetch_data, process_data, save_data
 
 @pytest.mark.asyncio

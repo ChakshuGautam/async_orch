@@ -1,54 +1,59 @@
-# Async-Flow Wiki
+# async_orch Wiki
 
 ## 1. Introduction
 
-`async-flow` is a Python library designed for building and managing asynchronous task pipelines. It provides a flexible framework to define individual tasks, sequence them, run them in parallel with concurrency controls, and apply resilience patterns like circuit breakers. The library is built on `asyncio` to handle non-blocking operations efficiently.
+`async_orch` is a Python library designed for building and managing asynchronous task pipelines. It provides a flexible framework to define individual tasks, sequence them, run them in parallel with concurrency controls, and apply resilience patterns like circuit breakers. The library is built on `asyncio` to handle non-blocking operations efficiently.
 
 ## 2. Core Components & Concepts
 
 The library revolves around a few key components:
 
-*   **`Task`**: The fundamental unit of work.
-    *   It can wrap both synchronous (`def`) and asynchronous (`async def`) functions.
-    *   Each task maintains its state, tracked by the `TaskState` enum (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `RETRYING`, `CANCELLED`).
-    *   State transitions and results/errors are typically communicated via the `EventBus`.
+- **`Task`**: The fundamental unit of work.
 
-*   **`EventBus`**:
-    *   A global publish-subscribe mechanism.
-    *   Tasks, CircuitGroups, and other components emit events (e.g., state changes, errors, results) to this bus.
-    *   Allows for decoupled monitoring, logging, or other reactions to workflow events.
+  - It can wrap both synchronous (`def`) and asynchronous (`async def`) functions.
+  - Each task maintains its state, tracked by the `TaskState` enum (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `RETRYING`, `CANCELLED`).
+  - State transitions and results/errors are typically communicated via the `EventBus`.
 
-*   **`Sequence`**:
-    *   A composite task that executes a series of steps (Tasks, other Sequences, or Parallels) one after another.
-    *   If any step fails, the sequence typically stops and propagates the error.
-    *   Returns an ordered list of results from each successfully completed step.
+- **`EventBus`**:
 
-*   **`Parallel`**:
-    *   A composite task that executes multiple jobs (Tasks, Sequences, or other Parallels) concurrently.
-    *   Supports an optional `limit` parameter to control the maximum number of jobs running at the same time.
-    *   Waits for all jobs to complete and returns a list of their results. The order of results corresponds to the order of jobs defined.
+  - A global publish-subscribe mechanism.
+  - Tasks, CircuitGroups, and other components emit events (e.g., state changes, errors, results) to this bus.
+  - Allows for decoupled monitoring, logging, or other reactions to workflow events.
 
-*   **`CircuitGroup`**:
-    *   A specialized composite that wraps one or more tasks with a circuit breaker pattern, utilizing the `aiobreaker` library.
-    *   Helps prevent repeated calls to services or tasks that are failing.
-    *   Monitors failures and "opens" the circuit if the failure threshold (`fail_max`) is reached within a certain time, preventing further calls for a `reset_timeout` period.
-    *   Emits events for circuit state changes (e.g., `OPEN`, `CLOSED`, `HALF_OPEN`).
+- **`Sequence`**:
 
-*   **`TaskState`**:
-    *   An `Enum` defining the possible lifecycle states of a `Task`:
-        *   `PENDING`: Task is created but not yet started.
-        *   `RUNNING`: Task is currently executing.
-        *   `SUCCEEDED`: Task completed successfully.
-        *   `FAILED`: Task terminated with an error.
-        *   `RETRYING`: Task failed and is being retried (often part of a custom retry policy).
-        *   `CANCELLED`: Task execution was cancelled.
+  - A composite task that executes a series of steps (Tasks, other Sequences, or Parallels) one after another.
+  - If any step fails, the sequence typically stops and propagates the error.
+  - Returns an ordered list of results from each successfully completed step.
+
+- **`Parallel`**:
+
+  - A composite task that executes multiple jobs (Tasks, Sequences, or other Parallels) concurrently.
+  - Supports an optional `limit` parameter to control the maximum number of jobs running at the same time.
+  - Waits for all jobs to complete and returns a list of their results. The order of results corresponds to the order of jobs defined.
+
+- **`CircuitGroup`**:
+
+  - A specialized composite that wraps one or more tasks with a circuit breaker pattern, utilizing the `aiobreaker` library.
+  - Helps prevent repeated calls to services or tasks that are failing.
+  - Monitors failures and "opens" the circuit if the failure threshold (`fail_max`) is reached within a certain time, preventing further calls for a `reset_timeout` period.
+  - Emits events for circuit state changes (e.g., `OPEN`, `CLOSED`, `HALF_OPEN`).
+
+- **`TaskState`**:
+  - An `Enum` defining the possible lifecycle states of a `Task`:
+    - `PENDING`: Task is created but not yet started.
+    - `RUNNING`: Task is currently executing.
+    - `SUCCEEDED`: Task completed successfully.
+    - `FAILED`: Task terminated with an error.
+    - `RETRYING`: Task failed and is being retried (often part of a custom retry policy).
+    - `CANCELLED`: Task execution was cancelled.
 
 ## 3. Key Features
 
-*   **Asynchronous by Design**: Built on Python's `asyncio` library, enabling efficient handling of I/O-bound operations and concurrent task execution.
-*   **Composability**: Tasks and composite structures (`Sequence`, `Parallel`, `CircuitGroup`) can be nested to create complex and sophisticated workflows.
-*   **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of tasks and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
-*   **Extensible Execution Policies**: The `Task._execute_with_policies` method is designed to be overridden or monkey-patched. This allows for the integration of custom behaviors such as retry mechanisms (as demonstrated in `examples/example.py` using the `backoff` library) or other advanced execution strategies.
+- **Asynchronous by Design**: Built on Python's `asyncio` library, enabling efficient handling of I/O-bound operations and concurrent task execution.
+- **Composability**: Tasks and composite structures (`Sequence`, `Parallel`, `CircuitGroup`) can be nested to create complex and sophisticated workflows.
+- **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of tasks and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
+- **Extensible Execution Policies**: The `Task._execute_with_policies` method is designed to be overridden or monkey-patched. This allows for the integration of custom behaviors such as retry mechanisms (as demonstrated in `examples/example.py` using the `backoff` library) or other advanced execution strategies.
 
 ## 4. How to Use (Illustrated with examples from `examples/example.py`)
 
@@ -58,7 +63,7 @@ Tasks can wrap either asynchronous or synchronous functions.
 
 ```python
 # From examples/example.py
-from async_flow import Task
+from async_orch import Task
 import asyncio
 
 # Asynchronous task
@@ -81,7 +86,7 @@ Execute tasks one after another.
 
 ```python
 # From examples/example.py
-from async_flow import Task, Sequence, event_bus, TaskState # Assuming fetch_data, process_data, save_data are defined
+from async_orch import Task, Sequence, event_bus, TaskState # Assuming fetch_data, process_data, save_data are defined
 # ... (fetch_data, process_data, save_data definitions) ...
 
 nested_pipeline = Sequence(
@@ -101,7 +106,7 @@ Execute tasks concurrently, optionally limiting concurrency.
 
 ```python
 # From examples/example.py
-from async_flow import Task, Parallel # Assuming fetch_data is defined
+from async_orch import Task, Parallel # Assuming fetch_data is defined
 # ... (fetch_data definition) ...
 
 results = await Parallel(
@@ -120,7 +125,7 @@ The `Task._execute_with_policies` method can be enhanced for retries. `examples/
 
 ```python
 # From examples/example.py (simplified)
-from async_flow import Task, TaskState, event_bus # Assuming flaky_task is defined
+from async_orch import Task, TaskState, event_bus # Assuming flaky_task is defined
 import backoff
 import asyncio
 
@@ -166,7 +171,7 @@ Protect your system from cascading failures.
 
 ```python
 # From examples/example.py
-from async_flow import Task, CircuitGroup # Assuming fetch_data, process_data are defined
+from async_orch import Task, CircuitGroup # Assuming fetch_data, process_data are defined
 # ... (fetch_data, process_data definitions) ...
 
 breaker_group = CircuitGroup(
@@ -194,7 +199,7 @@ Monitor task and circuit events.
 
 ```python
 # From examples/example.py
-from async_flow import event_bus # Assuming TaskState is also imported if used in event
+from async_orch import event_bus # Assuming TaskState is also imported if used in event
 import asyncio
 
 async def log_event(event): # Made async to match EventBus.emit
@@ -204,6 +209,7 @@ async def log_event(event): # Made async to match EventBus.emit
 # The lambda creates an asyncio.create_task for fire-and-forget
 event_bus.subscribe(lambda e: asyncio.create_task(log_event(e)))
 ```
+
 When a task changes state, an event like this might be emitted:
 `{'type': 'task', 'task': <Task Fetch1>, 'state': TaskState.RUNNING}`
 `{'type': 'task', 'task': <Task Fetch1>, 'state': TaskState.SUCCEEDED, 'result': 'data_1'}`
@@ -213,37 +219,38 @@ For circuit breakers:
 
 ### Top-level Runner
 
-The `async_flow.run()` function provides a convenient way to execute any top-level task, sequence, parallel group, or circuit group.
+The `async_orch.run()` function provides a convenient way to execute any top-level task, sequence, parallel group, or circuit group.
 
 ```python
-import async_flow
+import async_orch
 
 # Assuming 'my_main_workflow' is a Task, Sequence, Parallel, or CircuitGroup instance
-# await async_flow.run(my_main_workflow)
+# await async_orch.run(my_main_workflow)
 ```
 
 ## 5. Codebase Structure
 
-*   **`async_flow/__init__.py`**: This file contains the core framework classes:
-    *   `EventBus`: Manages event subscriptions and emissions.
-    *   `TaskState`: Enum for task lifecycle states.
-    *   `Task`: The basic execution unit.
-    *   `Sequence`: For sequential execution of tasks.
-    *   `Parallel`: For concurrent execution of tasks.
-    *   `CircuitGroup`: Implements the circuit breaker pattern for a group of tasks.
-    *   `run()`: A top-level convenience function to execute any workflow component.
+- **`async_orch/__init__.py`**: This file contains the core framework classes:
 
-*   **`examples/example.py`**: This file provides practical usage examples of the `async-flow` library. It demonstrates:
-    *   Defining various types of tasks (I/O-bound, CPU-bound-like).
-    *   Constructing sequences and parallel groups.
-    *   Implementing a retry mechanism for a flaky task.
-    *   Using a circuit breaker.
-    *   Subscribing to the event bus for logging.
-    *   Running a mixed pipeline of sequences and parallel groups.
+  - `EventBus`: Manages event subscriptions and emissions.
+  - `TaskState`: Enum for task lifecycle states.
+  - `Task`: The basic execution unit.
+  - `Sequence`: For sequential execution of tasks.
+  - `Parallel`: For concurrent execution of tasks.
+  - `CircuitGroup`: Implements the circuit breaker pattern for a group of tasks.
+  - `run()`: A top-level convenience function to execute any workflow component.
+
+- **`examples/example.py`**: This file provides practical usage examples of the `async_orch` library. It demonstrates:
+  - Defining various types of tasks (I/O-bound, CPU-bound-like).
+  - Constructing sequences and parallel groups.
+  - Implementing a retry mechanism for a flaky task.
+  - Using a circuit breaker.
+  - Subscribing to the event bus for logging.
+  - Running a mixed pipeline of sequences and parallel groups.
 
 ## 6. Running the Examples
 
-To see the `async-flow` library in action, you can run the `examples/example.py` script:
+To see the `async_orch` library in action, you can run the `examples/example.py` script:
 
 ```bash
 python examples/example.py

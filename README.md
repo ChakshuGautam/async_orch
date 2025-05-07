@@ -1,24 +1,24 @@
-# Async-Flow: Asynchronous Task Pipelines
+# async_orch: Asynchronous Task Pipelines
 
-[![PyPI version](https://badge.fury.io/py/async-flow.svg)](https://badge.fury.io/py/async-flow)
+[![PyPI version](https://badge.fury.io/py/async_orch.svg)](https://badge.fury.io/py/async_orch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`async-flow` is a Python library designed for building and managing asynchronous task pipelines. It provides a flexible framework to define individual tasks, sequence them, run them in parallel with concurrency controls, and apply resilience patterns like circuit breakers. The library is built on `asyncio` (Python 3.11+) to handle non-blocking operations efficiently.
+`async_orch` is a Python library designed for building and managing asynchronous task pipelines. It provides a flexible framework to define individual tasks, sequence them, run them in parallel with concurrency controls, and apply resilience patterns like circuit breakers. The library is built on `asyncio` (Python 3.11+) to handle non-blocking operations efficiently.
 
 ## Key Features
 
-*   **Asynchronous by Design**: Leverages `asyncio` for efficient I/O-bound operations and concurrency.
-*   **Composability**: Build complex workflows by nesting `Task`, `Sequence`, `Parallel`, and `CircuitGroup` components.
-*   **State Management & Observability**: A global `EventBus` allows for monitoring task states and circuit breaker events.
-*   **Resilience Patterns**: Includes `CircuitGroup` for circuit breaker functionality (using `aiobreaker`).
-*   **Extensible Policies**: Customize task execution with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
+- **Asynchronous by Design**: Leverages `asyncio` for efficient I/O-bound operations and concurrency.
+- **Composability**: Build complex workflows by nesting `Task`, `Sequence`, `Parallel`, and `CircuitGroup` components.
+- **State Management & Observability**: A global `EventBus` allows for monitoring task states and circuit breaker events.
+- **Resilience Patterns**: Includes `CircuitGroup` for circuit breaker functionality (using `aiobreaker`).
+- **Extensible Policies**: Customize task execution with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
 
 ## Installation
 
-You can install `async-flow` using pip:
+You can install `async_orch` using pip:
 
 ```bash
-pip install async-flow
+pip install async_orch
 ```
 
 Requires Python 3.11 or newer.
@@ -29,7 +29,7 @@ Here's a simple example of defining and running a sequence of tasks:
 
 ```python
 import asyncio
-from async_flow import Task, Sequence, run
+from async_orch import Task, Sequence, run
 
 # Define some tasks
 async def fetch_user_data(user_id: int) -> dict:
@@ -69,16 +69,17 @@ if __name__ == "__main__":
 
 ## Documentation
 
-For detailed information on all components, advanced usage, and more examples, please refer to the [**Async-Flow Wiki**](docs/wiki.md).
+For detailed information on all components, advanced usage, and more examples, please refer to the [**async_orch Wiki**](docs/wiki.md).
 
 The wiki covers:
-*   Core Components: `Task`, `EventBus`, `Sequence`, `Parallel`, `CircuitGroup`, `TaskState`.
-*   Advanced Patterns: Implementing retries, using the event bus for logging.
-*   Codebase structure and how to run the bundled examples.
+
+- Core Components: `Task`, `EventBus`, `Sequence`, `Parallel`, `CircuitGroup`, `TaskState`.
+- Advanced Patterns: Implementing retries, using the event bus for logging.
+- Codebase structure and how to run the bundled examples.
 
 ## Examples
 
-The `examples/` directory contains scripts demonstrating various features of `async-flow`. You can run them directly:
+The `examples/` directory contains scripts demonstrating various features of `async_orch`. You can run them directly:
 
 ## Contributing
 
