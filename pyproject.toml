@@ -34,6 +34,7 @@ test = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.20.0",
     "backoff>=2.0.0", # Added as it's used in examples and thus tests
+    "pytest-cov>=4.0.0",
 ]
 
 [tool.pytest.ini_options]

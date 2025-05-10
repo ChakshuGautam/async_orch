@@ -1,6 +1,7 @@
 # async_orch: Asynchronous Task Pipelines
 
 [![PyPI version](https://badge.fury.io/py/async_orch.svg)](https://badge.fury.io/py/async_orch)
+[![codecov](https://codecov.io/gh/ChakshuGautam/async_orch/graph/badge.svg?token=Q9L3VBK3G5)](https://codecov.io/gh/ChakshuGautam/async_orch)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `async_orch` is a Python library designed for building and managing asynchronous task pipelines. It provides a flexible framework to define individual tasks, sequence them, run them in parallel with concurrency controls, and apply resilience patterns like circuit breakers. The library is built on `asyncio` (Python 3.11+) to handle non-blocking operations efficiently.
