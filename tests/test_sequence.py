@@ -1,5 +1,5 @@
 import pytest
-from async_orch import Sequence, Parallel, run # Import global run
+from async_orch import Sequence, Parallel, run  # Import global run
 from tests.helpers import fetch_data, process_data, save_data
 
 
@@ -10,15 +10,15 @@ async def test_simple_sequence_execution(capsys):
     """
     # Define the sequence using raw functions and lambdas for arguments
     nested_pipeline_def = Sequence(
-        lambda: fetch_data(1), # Use lambda for args
-        process_data,          # Receives output from fetch_data(1)
-        save_data,             # Receives output from process_data
+        lambda: fetch_data(1),  # Use lambda for args
+        process_data,  # Receives output from fetch_data(1)
+        save_data,  # Receives output from process_data
         name="TestNestedPipeline",
     )
     # Execute using the global run function
     result = await run(nested_pipeline_def)
 
-    assert result == "DATA_1" # save_data returns its input
+    assert result == "DATA_1"  # save_data returns its input
     captured = capsys.readouterr()
     assert "Saved: DATA_1" in captured.out
 
@@ -53,7 +53,7 @@ async def test_mixed_sequence_parallel_execution(capsys):
     captured = capsys.readouterr()
     assert "Saved: " in captured.out
     # The exact string representation of the list might vary in order
-    assert ("['ALPHA', 'BETA']" in captured.out or "['BETA', 'ALPHA']" in captured.out)
+    assert "['ALPHA', 'BETA']" in captured.out or "['BETA', 'ALPHA']" in captured.out
 
 
 @pytest.mark.asyncio
@@ -68,8 +68,7 @@ async def test_sequence_with_no_tasks():
 async def test_sequence_with_one_task():
     """Tests Sequence flow with a single task using the new definition API."""
     single_task_sequence_def = Sequence(
-        lambda: fetch_data(1), # Use lambda for args
-        name="TestSingleTaskSequence"
+        lambda: fetch_data(1), name="TestSingleTaskSequence"  # Use lambda for args
     )
     result = await run(single_task_sequence_def)
     assert result == "data_1"

@@ -1,5 +1,5 @@
 import pytest
-from async_orch import Parallel, run # Import global run
+from async_orch import Parallel, run  # Import global run
 from tests.helpers import fetch_data
 
 
@@ -37,8 +37,7 @@ async def test_parallel_with_empty_tasks():
 async def test_parallel_with_one_task():
     """Tests Parallel flow with a single task using the new definition API."""
     single_task_parallel_def = Parallel(
-        lambda: fetch_data(1), # Use lambda for args
-        name="TestSingleTaskParallel"
+        lambda: fetch_data(1), name="TestSingleTaskParallel"  # Use lambda for args
     )
     results = await run(single_task_parallel_def)
     # Parallel always returns a list of results, even for one task.

@@ -4,7 +4,9 @@ from unittest.mock import MagicMock, patch
 
 # Updated imports for the new API
 from async_orch import CircuitDefinition, CircuitBreakerError, run, event_bus, TaskState
-from tests.helpers import log_event_for_test # Using helpers' fetch_data is not needed here
+from tests.helpers import (
+    log_event_for_test,
+)  # Using helpers' fetch_data is not needed here
 
 
 # @pytest.mark.asyncio
