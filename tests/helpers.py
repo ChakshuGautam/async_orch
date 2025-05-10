@@ -1,7 +1,7 @@
 import asyncio
 import random
 import backoff
-from async_orch import Task, Sequence, Parallel, CircuitGroup, event_bus as global_event_bus, TaskState
+from async_orch import TaskRunner, Sequence, Parallel, CircuitGroup, event_bus as global_event_bus, TaskState
 
 # --- Event Bus and Logging (Test-Friendly) --------------------------------
 # Provide the global event_bus instance from async_orch
@@ -46,7 +46,7 @@ def flaky_task_func():
 
 # Helper to create a flaky task with retry policy
 def create_flaky_task_with_retry(name="FlakyTaskWithRetry", max_tries=3):
-    task_flaky = Task(flaky_task_func, name=name)
+    task_flaky = TaskRunner(flaky_task_func, name=name)
 
     # Monkey-patch retry policy (as in original example)
     def retry_policy_for_task(fn_to_wrap, task_instance):

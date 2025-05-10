@@ -1,4 +1,4 @@
-from async_orch import Task, Sequence, Parallel, CircuitGroup, event_bus, TaskState
+from async_orch import TaskRunner, Sequence, Parallel, CircuitGroup, event_bus, TaskState
 import asyncio
 
 # Subscribe a simple logger to event bus
@@ -23,9 +23,9 @@ def save_data(processed):
     print(f"Saved: {processed}")
 
 nested_pipeline = Sequence(
-    Task(fetch_data, 1, name="Fetch1"),
-    Task(process_data, name="Process1"),
-    Task(save_data, name="Save1"),
+    TaskRunner(fetch_data, 1, name="Fetch1"),
+    TaskRunner(process_data, name="Process1"),
+    TaskRunner(save_data, name="Save1"),
     name="NestedPipeline"
 )
 
@@ -36,7 +36,7 @@ def flaky_task():
         raise RuntimeError("Flaky failure!")
     return "flaky_success"
 
-task_flaky = Task(flaky_task, name="Flaky")
+task_flaky = TaskRunner(flaky_task, name="Flaky")
 # Monkey-patch retry policy
 import backoff
 from async_orch import TaskState # Corrected import
@@ -64,8 +64,8 @@ task_flaky._execute_with_policies = retry_policy(original_execute_policies, task
 
 # 5. Circuit Breaker Group Demo
 breaker_group = CircuitGroup(
-    Task(fetch_data, 2, name="Fetch2"),
-    Task(process_data, name="Process2"),
+    TaskRunner(fetch_data, 2, name="Fetch2"),
+    TaskRunner(process_data, name="Process2"),
     fail_max=2, reset_timeout=10,
     name="CircuitDemo"
 )
@@ -74,9 +74,9 @@ breaker_group = CircuitGroup(
 async def example_simple_parallel():
     print("Example 1: Simple Parallel Execution")
     results = await Parallel(
-        Task(fetch_data, 10),
-        Task(fetch_data, 20),
-        Task(fetch_data, 30),
+        TaskRunner(fetch_data, 10),
+        TaskRunner(fetch_data, 20),
+        TaskRunner(fetch_data, 30),
         limit=2,
         name="SimpleParallel"
     ).run()
@@ -112,13 +112,13 @@ async def example_mixed_pipeline():
     print("Example 5: Mixed Sequence & Parallel")
     
     pipeline = Sequence(
-        Task(fetch_data, 100, name="Fetch100"), 
+        TaskRunner(fetch_data, 100, name="Fetch100"), 
         Parallel(
-            Task(process_data, "alpha", name="ProcessAlpha"),
-            Task(process_data, "beta", name="ProcessBeta"),
+            TaskRunner(process_data, "alpha", name="ProcessAlpha"),
+            TaskRunner(process_data, "beta", name="ProcessBeta"),
             name="ProcessParallel"
         ),
-        Task(save_data, "Mixed pipeline processed data saved.", name="SaveMixedSummary"),
+        TaskRunner(save_data, "Mixed pipeline processed data saved.", name="SaveMixedSummary"),
         name="MixedPipeline"
     )
     await pipeline.run()

@@ -8,10 +8,10 @@
 ## Key Features
 
 - **Asynchronous by Design**: Leverages `asyncio` for efficient I/O-bound operations and concurrency.
-- **Composability**: Build complex workflows by nesting `Task`, `Sequence`, `Parallel`, and `CircuitGroup` components.
-- **State Management & Observability**: A global `EventBus` allows for monitoring task states and circuit breaker events.
+- **Composability**: Build complex workflows by nesting `TaskRunner`, `Sequence`, `Parallel`, and `CircuitGroup` components.
+- **State Management & Observability**: A global `EventBus` allows for monitoring TaskRunner states and circuit breaker events.
 - **Resilience Patterns**: Includes `CircuitGroup` for circuit breaker functionality (using `aiobreaker`).
-- **Extensible Policies**: Customize task execution with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
+- **Extensible Policies**: Customize TaskRunner execution with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
 
 ## Installation
 
@@ -29,7 +29,7 @@ Here's a simple example of defining and running a sequence of tasks:
 
 ```python
 import asyncio
-from async_orch import Task, Sequence, run
+from async_orch import TaskRunner, Sequence, run
 
 # Define some tasks
 async def fetch_user_data(user_id: int) -> dict:
@@ -49,9 +49,9 @@ async def notify_user(data: dict):
 
 # Create a pipeline
 user_pipeline = Sequence(
-    Task(fetch_user_data, 101, name="FetchUserData"),
-    Task(process_user_data, name="ProcessUserData"), # Takes output from previous task
-    Task(notify_user, name="NotifyUser")            # Takes output from previous task
+    TaskRunner(fetch_user_data, 101, name="FetchUserData"),
+    TaskRunner(process_user_data, name="ProcessUserData"), # Takes output from previous task
+    TaskRunner(notify_user, name="NotifyUser")            # Takes output from previous task
 )
 
 async def main():
@@ -73,7 +73,7 @@ For detailed information on all components, advanced usage, and more examples, p
 
 The wiki covers:
 
-- Core Components: `Task`, `EventBus`, `Sequence`, `Parallel`, `CircuitGroup`, `TaskState`.
+- Core Components: `TaskRunner`, `EventBus`, `Sequence`, `Parallel`, `CircuitGroup`, `TaskState`.
 - Advanced Patterns: Implementing retries, using the event bus for logging.
 - Codebase structure and how to run the bundled examples.
 

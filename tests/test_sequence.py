@@ -1,5 +1,5 @@
 import pytest
-from async_orch import Task, Sequence, Parallel
+from async_orch import TaskRunner, Sequence, Parallel
 from tests.helpers import fetch_data, process_data, save_data
 
 @pytest.mark.asyncio
@@ -9,9 +9,9 @@ async def test_simple_sequence_execution(capsys):
     Corresponds to example_nested_sequence.
     """
     nested_pipeline = Sequence(
-        Task(fetch_data, 1, name="Fetch1"),
-        Task(process_data, name="Process1"),
-        Task(save_data, name="Save1"),
+        TaskRunner(fetch_data, 1, name="Fetch1"),
+        TaskRunner(process_data, name="Process1"),
+        TaskRunner(save_data, name="Save1"),
         name="TestNestedPipeline"
     )
     result = await nested_pipeline.run()
@@ -28,13 +28,13 @@ async def test_mixed_sequence_parallel_execution(capsys):
     Corresponds to example_mixed_pipeline.
     """
     mixed_pipeline = Sequence(
-        Task(fetch_data, 100, name="Fetch100"), # Output: "data_100"
+        TaskRunner(fetch_data, 100, name="Fetch100"), # Output: "data_100"
         Parallel( # Input: "data_100" (but tasks inside don't use it)
-            Task(process_data, "alpha", name="ProcessAlpha"), # Output: "ALPHA"
-            Task(process_data, "beta", name="ProcessBeta"),   # Output: "BETA"
+            TaskRunner(process_data, "alpha", name="ProcessAlpha"), # Output: "ALPHA"
+            TaskRunner(process_data, "beta", name="ProcessBeta"),   # Output: "BETA"
             name="TestProcessParallel" 
         ), # Output: ["ALPHA", "BETA"] (or ["BETA", "ALPHA"])
-        Task(save_data, name="SaveMixedSummary"), # Input: ["ALPHA", "BETA"]
+        TaskRunner(save_data, name="SaveMixedSummary"), # Input: ["ALPHA", "BETA"]
         name="TestMixedPipeline"
     )
     result = await mixed_pipeline.run()
@@ -63,7 +63,7 @@ async def test_sequence_with_no_tasks():
 async def test_sequence_with_one_task():
     """Tests Sequence flow with a single task."""
     seq_flow = Sequence(
-        Task(fetch_data, 1, name="FetchSingle"),
+        TaskRunner(fetch_data, 1, name="FetchSingle"),
         name="TestSingleTaskSequence"
     )
     result = await seq_flow.run()

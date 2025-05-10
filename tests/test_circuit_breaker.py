@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import MagicMock, patch
 import sys
 
-from async_orch import Task, CircuitGroup, CircuitBreakerError
+from async_orch import TaskRunner, CircuitGroup, CircuitBreakerError
 from tests.helpers import fetch_data, process_data # Using helpers' fetch_data
 
 @pytest.mark.asyncio
@@ -27,7 +27,7 @@ async def test_circuit_breaker_opens_and_recovers():
 
     # Using a very short reset_timeout for faster tests
     circuit_group = CircuitGroup(
-        Task(mock_task_func, "arg1", name="CBTask1"),
+        TaskRunner(mock_task_func, "arg1", name="CBTask1"),
         # Can add more tasks if needed, but one is enough to test CB logic
         fail_max=2, 
         reset_timeout=0.1, 

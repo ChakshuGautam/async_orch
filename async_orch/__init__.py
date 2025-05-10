@@ -40,7 +40,7 @@ class TaskState(Enum):
 TaskFn = Callable[..., Union[Awaitable[Any], Any]]
 
 # --- Core Task -------------------------------------------------------------
-class Task:
+class TaskRunner:
     def __init__(self, fn: TaskFn, *args, name: str = None, **kwargs):
         self.fn = fn
         self.args = args
@@ -82,7 +82,7 @@ class Task:
 
 # --- Sequence --------------------------------------------------------------
 class Sequence:
-    def __init__(self, *steps: Union[Task, 'Sequence', 'Parallel'], name: str = None):
+    def __init__(self, *steps: Union[TaskRunner, 'Sequence', 'Parallel'], name: str = None):
         self.steps = steps
         self.name = name or "Sequence"
 
@@ -94,7 +94,7 @@ class Sequence:
             if i == 0:
                 result = await step.run()
             else:
-                if isinstance(step, Task):
+                if isinstance(step, TaskRunner):
                     sig = inspect.signature(step.fn)
                     params = list(sig.parameters.values())
                     if params and (params[0].name in ("self", "cls")):
@@ -109,7 +109,7 @@ class Sequence:
 
 # --- Parallel --------------------------------------------------------------
 class Parallel:
-    def __init__(self, *jobs: Union[Task, Sequence, 'Parallel'], limit: int = None, name: str = None):
+    def __init__(self, *jobs: Union[TaskRunner, Sequence, 'Parallel'], limit: int = None, name: str = None):
         self.jobs = jobs
         self.limit = limit
         self.name = name or "Parallel"
@@ -170,7 +170,7 @@ class CircuitGroup:
         def close(self, breaker):
             pass
 
-    def __init__(self, *tasks: Union[Task, Sequence, Parallel],
+    def __init__(self, *tasks: Union[TaskRunner, Sequence, Parallel],
                  fail_max: int = 5, reset_timeout: int = 60,
                  name: str = None):
         self.tasks = tasks
@@ -204,6 +204,6 @@ class CircuitGroup:
             raise
 
 # --- Convenience Entrypoint -----------------------------------------------
-async def run(task: Union[Task, Sequence, Parallel, CircuitGroup]) -> Any:
-    """Top-level runner for any Task/Sequence/Parallel/CircuitGroup."""
+async def run(task: Union[TaskRunner, Sequence, Parallel, CircuitGroup]) -> Any:
+    """Top-level runner for any TaskRunner/Sequence/Parallel/CircuitGroup."""
     return await task.run()

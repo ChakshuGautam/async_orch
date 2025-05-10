@@ -1,5 +1,5 @@
 import pytest
-from async_orch import Task, Parallel
+from async_orch import TaskRunner, Parallel
 from tests.helpers import fetch_data
 
 @pytest.mark.asyncio
@@ -9,9 +9,9 @@ async def test_simple_parallel_execution():
     Corresponds to example_simple_parallel.
     """
     parallel_flow = Parallel(
-        Task(fetch_data, 10, name="Fetch10"),
-        Task(fetch_data, 20, name="Fetch20"),
-        Task(fetch_data, 30, name="Fetch30"),
+        TaskRunner(fetch_data, 10, name="Fetch10"),
+        TaskRunner(fetch_data, 20, name="Fetch20"),
+        TaskRunner(fetch_data, 30, name="Fetch30"),
         limit=2, # As in original example
         name="TestSimpleParallel"
     )
@@ -37,7 +37,7 @@ async def test_parallel_with_empty_tasks():
 async def test_parallel_with_one_task():
     """Tests Parallel flow with a single task."""
     parallel_flow = Parallel(
-        Task(fetch_data, 1, name="FetchSingle"),
+        TaskRunner(fetch_data, 1, name="FetchSingle"),
         name="TestSingleTaskParallel"
     )
     results = await parallel_flow.run()

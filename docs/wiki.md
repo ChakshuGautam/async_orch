@@ -8,7 +8,7 @@
 
 The library revolves around a few key components:
 
-- **`Task`**: The fundamental unit of work.
+- **`TaskRunner`**: The fundamental unit of work.
 
   - It can wrap both synchronous (`def`) and asynchronous (`async def`) functions.
   - Each task maintains its state, tracked by the `TaskState` enum (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `RETRYING`, `CANCELLED`).
@@ -22,19 +22,19 @@ The library revolves around a few key components:
 
 - **`Sequence`**:
 
-  - A composite task that executes a series of steps (Tasks, other Sequences, or Parallels) one after another.
+  - A composite task that executes a series of steps (TaskRunners, other Sequences, or Parallels) one after another.
   - If any step fails, the sequence typically stops and propagates the error.
   - Returns an ordered list of results from each successfully completed step.
 
 - **`Parallel`**:
 
-  - A composite task that executes multiple jobs (Tasks, Sequences, or other Parallels) concurrently.
+  - A composite task that executes multiple jobs (TaskRunners, Sequences, or other Parallels) concurrently.
   - Supports an optional `limit` parameter to control the maximum number of jobs running at the same time.
   - Waits for all jobs to complete and returns a list of their results. The order of results corresponds to the order of jobs defined.
 
 - **`CircuitGroup`**:
 
-  - A specialized composite that wraps one or more tasks with a circuit breaker pattern, utilizing the `aiobreaker` library.
+  - A specialized composite that wraps one or more TaskRunners (or Sequences/Parallels) with a circuit breaker pattern, utilizing the `aiobreaker` library.
   - Helps prevent repeated calls to services or tasks that are failing.
   - Monitors failures and "opens" the circuit if the failure threshold (`fail_max`) is reached within a certain time, preventing further calls for a `reset_timeout` period.
   - Emits events for circuit state changes (e.g., `OPEN`, `CLOSED`, `HALF_OPEN`).
@@ -51,9 +51,9 @@ The library revolves around a few key components:
 ## 3. Key Features
 
 - **Asynchronous by Design**: Built on Python's `asyncio` library, enabling efficient handling of I/O-bound operations and concurrent task execution.
-- **Composability**: Tasks and composite structures (`Sequence`, `Parallel`, `CircuitGroup`) can be nested to create complex and sophisticated workflows.
-- **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of tasks and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
-- **Extensible Execution Policies**: The `Task._execute_with_policies` method is designed to be overridden or monkey-patched. This allows for the integration of custom behaviors such as retry mechanisms (as demonstrated in `examples/example.py` using the `backoff` library) or other advanced execution strategies.
+- **Composability**: TaskRunners and composite structures (`Sequence`, `Parallel`, `CircuitGroup`) can be nested to create complex and sophisticated workflows.
+- **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of TaskRunners and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
+- **Extensible Execution Policies**: The `TaskRunner._execute_with_policies` method is designed to be overridden or monkey-patched. This allows for the integration of custom behaviors such as retry mechanisms (as demonstrated in `examples/example.py` using the `backoff` library) or other advanced execution strategies.
 
 ## 4. How to Use (Illustrated with examples from `examples/example.py`)
 
@@ -63,7 +63,7 @@ Tasks can wrap either asynchronous or synchronous functions.
 
 ```python
 # From examples/example.py
-from async_orch import Task
+from async_orch import TaskRunner
 import asyncio
 
 # Asynchronous task
@@ -71,13 +71,13 @@ async def fetch_data(id):
     await asyncio.sleep(0.5)
     return f"data_{id}"
 
-task_fetch = Task(fetch_data, 1)
+task_fetch = TaskRunner(fetch_data, 1)
 
 # Synchronous task
 def process_data(data):
     return data.upper()
 
-task_process = Task(process_data, "some_data")
+task_process = TaskRunner(process_data, "some_data")
 ```
 
 ### Creating a `Sequence`
@@ -86,13 +86,13 @@ Execute tasks one after another.
 
 ```python
 # From examples/example.py
-from async_orch import Task, Sequence, event_bus, TaskState # Assuming fetch_data, process_data, save_data are defined
+from async_orch import TaskRunner, Sequence, event_bus, TaskState # Assuming fetch_data, process_data, save_data are defined
 # ... (fetch_data, process_data, save_data definitions) ...
 
 nested_pipeline = Sequence(
-    Task(fetch_data, 1, name="Fetch1"),
-    Task(process_data, name="Process1"), # process_data is sync
-    Task(save_data, name="Save1"),      # save_data is sync
+    TaskRunner(fetch_data, 1, name="Fetch1"),
+    TaskRunner(process_data, name="Process1"), # process_data is sync
+    TaskRunner(save_data, name="Save1"),      # save_data is sync
     name="NestedPipeline"
 )
 
@@ -106,13 +106,13 @@ Execute tasks concurrently, optionally limiting concurrency.
 
 ```python
 # From examples/example.py
-from async_orch import Task, Parallel # Assuming fetch_data is defined
+from async_orch import TaskRunner, Parallel # Assuming fetch_data is defined
 # ... (fetch_data definition) ...
 
 results = await Parallel(
-    Task(fetch_data, 10),
-    Task(fetch_data, 20),
-    Task(fetch_data, 30),
+    TaskRunner(fetch_data, 10),
+    TaskRunner(fetch_data, 20),
+    TaskRunner(fetch_data, 30),
     limit=2, # Optional: Max 2 tasks run at once
     name="SimpleParallel"
 ).run()
@@ -121,16 +121,16 @@ results = await Parallel(
 
 ### Implementing Retries
 
-The `Task._execute_with_policies` method can be enhanced for retries. `examples/example.py` demonstrates this by monkey-patching with the `backoff` library.
+The `TaskRunner._execute_with_policies` method can be enhanced for retries. `examples/example.py` demonstrates this by monkey-patching with the `backoff` library.
 
 ```python
 # From examples/example.py (simplified)
-from async_orch import Task, TaskState, event_bus # Assuming flaky_task is defined
+from async_orch import TaskRunner, TaskState, event_bus # Assuming flaky_task is defined
 import backoff
 import asyncio
 
 # ... (flaky_task definition) ...
-task_flaky = Task(flaky_task, name="Flaky")
+task_flaky = TaskRunner(flaky_task, name="Flaky")
 
 def retry_policy(fn_to_wrap, task_instance):
     async def on_backoff_handler(details):
@@ -171,12 +171,12 @@ Protect your system from cascading failures.
 
 ```python
 # From examples/example.py
-from async_orch import Task, CircuitGroup # Assuming fetch_data, process_data are defined
+from async_orch import TaskRunner, CircuitGroup # Assuming fetch_data, process_data are defined
 # ... (fetch_data, process_data definitions) ...
 
 breaker_group = CircuitGroup(
-    Task(fetch_data, 2, name="Fetch2"),
-    Task(process_data, name="Process2"), # Assuming process_data can also fail
+    TaskRunner(fetch_data, 2, name="Fetch2"),
+    TaskRunner(process_data, name="Process2"), # Assuming process_data can also fail
     fail_max=2,        # Open circuit after 2 failures
     reset_timeout=10,  # Try to close circuit after 10 seconds
     name="CircuitDemo"
@@ -211,20 +211,20 @@ event_bus.subscribe(lambda e: asyncio.create_task(log_event(e)))
 ```
 
 When a task changes state, an event like this might be emitted:
-`{'type': 'task', 'task': <Task Fetch1>, 'state': TaskState.RUNNING}`
-`{'type': 'task', 'task': <Task Fetch1>, 'state': TaskState.SUCCEEDED, 'result': 'data_1'}`
+`{'type': 'task', 'task': <TaskRunner Fetch1>, 'state': TaskState.RUNNING}`
+`{'type': 'task', 'task': <TaskRunner Fetch1>, 'state': TaskState.SUCCEEDED, 'result': 'data_1'}`
 
 For circuit breakers:
 `{'type': 'circuit', 'circuit': <CircuitGroup CircuitDemo>, 'old_state': <CircuitBreakerState.CLOSED: 'closed'>, 'new_state': <CircuitBreakerState.OPEN: 'open'>}`
 
 ### Top-level Runner
 
-The `async_orch.run()` function provides a convenient way to execute any top-level task, sequence, parallel group, or circuit group.
+The `async_orch.run()` function provides a convenient way to execute any top-level TaskRunner, sequence, parallel group, or circuit group.
 
 ```python
 import async_orch
 
-# Assuming 'my_main_workflow' is a Task, Sequence, Parallel, or CircuitGroup instance
+# Assuming 'my_main_workflow' is a TaskRunner, Sequence, Parallel, or CircuitGroup instance
 # await async_orch.run(my_main_workflow)
 ```
 
@@ -234,9 +234,9 @@ import async_orch
 
   - `EventBus`: Manages event subscriptions and emissions.
   - `TaskState`: Enum for task lifecycle states.
-  - `Task`: The basic execution unit.
-  - `Sequence`: For sequential execution of tasks.
-  - `Parallel`: For concurrent execution of tasks.
+  - `TaskRunner`: The basic execution unit.
+  - `Sequence`: For sequential execution of TaskRunners.
+  - `Parallel`: For concurrent execution of TaskRunners.
   - `CircuitGroup`: Implements the circuit breaker pattern for a group of tasks.
   - `run()`: A top-level convenience function to execute any workflow component.
 
