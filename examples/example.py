@@ -104,7 +104,7 @@ async def example_simple_parallel():
         TaskRunner(fetch_data, 10),
         TaskRunner(fetch_data, 20),
         TaskRunner(fetch_data, 30),
-        limit=2,
+        max_workers=2,
         name="SimpleParallel",
     ).run()
     print("Results:", results)

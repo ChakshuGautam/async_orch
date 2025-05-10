@@ -115,25 +115,25 @@ class Sequence:
 class Parallel:
     def __init__(
         self,
-        *jobs: Union[TaskRunner, Sequence, "Parallel"],
-        limit: int = None,
+        *tasks: Union[TaskRunner, Sequence, "Parallel"],
+        max_workers: int = None,
         name: str = None,
     ):
-        self.jobs = jobs
-        self.limit = limit
+        self.tasks = tasks
+        self.max_workers = max_workers
         self.name = name or "Parallel"
 
     async def run(self) -> list[Any]:
-        if self.limit:
-            sem = asyncio.Semaphore(self.limit)
+        if self.max_workers:
+            sem = asyncio.Semaphore(self.max_workers)
 
-            async def sem_job(job):
+            async def sem_task(task):
                 async with sem:
-                    return await job.run()
+                    return await task.run()
 
-            coros = [sem_job(job) for job in self.jobs]
+            coros = [sem_task(task) for task in self.tasks]
         else:
-            coros = [job.run() for job in self.jobs]
+            coros = [task.run() for task in self.tasks]
 
         results = []
         try:

@@ -13,7 +13,7 @@ async def test_simple_parallel_execution():
         TaskRunner(fetch_data, 10, name="Fetch10"),
         TaskRunner(fetch_data, 20, name="Fetch20"),
         TaskRunner(fetch_data, 30, name="Fetch30"),
-        limit=2,  # As in original example
+        max_workers=2,  # As in original example
         name="TestSimpleParallel",
     )
     results = await parallel_flow.run()

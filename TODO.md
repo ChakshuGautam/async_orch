@@ -2,14 +2,15 @@
 
 ## Class and Method Naming
 - [x] Rename classes with descriptive CapWords (e.g., `TaskRun` to `TaskRunner` or `TaskExecution`, `MultiprocessTaskRun` to `MultiprocessTaskRunner`).
-- [ ] Use snake_case for method and variable names (e.g., `getResult()` to `get_result()`, `IsRunning()` to `is_running()`, `StopTask()` to `stop_task()`).
+- [x] Use snake_case for method and variable names (e.g., `getResult()` to `get_result()`, `IsRunning()` to `is_running()`, `StopTask()` to `stop_task()`).
 
 ## Parameter Naming and Context
-- [ ] Clarify parameter names and add context (e.g., `retries` to `max_retries`, `retry_sleep_time` to `retry_delay_seconds` or `retry_interval`, `parallelism` to `max_workers` or `concurrency`).
+- [x] Clarify parameter names and add context (e.g., `retries` to `max_retries`, `retry_sleep_time` to `retry_delay_seconds` or `retry_interval`, `parallelism` to `max_workers` or `concurrency`).
 
 ## Terminology and Role Names
-- [ ] Consolidate terminology and role names (e.g., use "task" consistently instead of mixing "job" or "activity").
+- [x] Consolidate terminology and role names (e.g., use "task" consistently instead of mixing "job" or "activity").
 - [ ] Rename runner classes consistently (e.g., `SequentialTaskRunner` instead of `SequentialTaskRun`).
+- [ ] Refactor `Sequence` and `Parallel` to accept raw callable functions directly, potentially making `TaskRunner` an internal implementation detail.
 
 ## Abbreviations
 - [ ] Avoid unclear abbreviations (e.g., `thr` to `thread` or `executor`, `ctx` to `context`, `conf` to `config`).
