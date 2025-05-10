@@ -4,7 +4,8 @@ from unittest.mock import MagicMock, patch
 import sys
 
 from async_orch import TaskRunner, CircuitGroup, CircuitBreakerError
-from tests.helpers import fetch_data, process_data # Using helpers' fetch_data
+from tests.helpers import fetch_data, process_data  # Using helpers' fetch_data
+
 
 @pytest.mark.asyncio
 async def test_circuit_breaker_opens_and_recovers():
@@ -17,21 +18,21 @@ async def test_circuit_breaker_opens_and_recovers():
     5. A succeeding task in half-open closes the circuit.
     6. A failing task in half-open re-opens the circuit.
     """
-    
+
     # Mock for the task function that can be controlled
     mock_task_func = MagicMock()
 
     # Initial setup: task succeeds
-    mock_task_func.side_effect = None # Clear side effects
+    mock_task_func.side_effect = None  # Clear side effects
     mock_task_func.return_value = "success_value"
 
     # Using a very short reset_timeout for faster tests
     circuit_group = CircuitGroup(
         TaskRunner(mock_task_func, "arg1", name="CBTask1"),
         # Can add more tasks if needed, but one is enough to test CB logic
-        fail_max=2, 
-        reset_timeout=0.1, 
-        name="TestCircuitDemo"
+        fail_max=2,
+        reset_timeout=0.1,
+        name="TestCircuitDemo",
     )
 
     # --- Phase 1: Normal operation, tasks succeed ---
@@ -75,7 +76,7 @@ async def test_circuit_breaker_opens_and_recovers():
         mock_task_func.assert_called_once_with("arg1")
 
     # --- Phase 4: Wait for reset_timeout, circuit goes to HALF_OPEN ---
-    await asyncio.sleep(0.25) # Wait longer than reset_timeout
+    await asyncio.sleep(0.25)  # Wait longer than reset_timeout
     # At this point, the circuit should be HALF_OPEN internally.
     # The next call will test this state.
 
@@ -83,7 +84,7 @@ async def test_circuit_breaker_opens_and_recovers():
     # mock_task_func.reset_mock()
     # mock_task_func.side_effect = None # Make task succeed again
     # mock_task_func.return_value = "half_open_success"
-    
+
     # result = await circuit_group.run()
     # assert result == ["half_open_success"]
     # assert circuit_group.current_state == "CLOSED" # Circuit closed after success in half-open

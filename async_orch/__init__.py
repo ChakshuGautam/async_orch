@@ -4,6 +4,7 @@ from typing import Callable, Union, Iterable, Any, Awaitable
 import inspect
 import sys
 
+
 # --- Event Bus for state notifications ------------------------------------
 class EventBus:
     def __init__(self):
@@ -24,20 +25,24 @@ class EventBus:
             # Fire and forget; subscriber handles its own errors
             asyncio.create_task(fn(event))
 
+
 # Global event bus
 event_bus = EventBus()
 
+
 # --- Task States -----------------------------------------------------------
 class TaskState(Enum):
-    PENDING   = auto()
-    RUNNING   = auto()
+    PENDING = auto()
+    RUNNING = auto()
     SUCCEEDED = auto()
-    FAILED    = auto()
-    RETRYING  = auto()
+    FAILED = auto()
+    RETRYING = auto()
     CANCELLED = auto()
+
 
 # A TaskFn is either a coroutine function or a sync function.
 TaskFn = Callable[..., Union[Awaitable[Any], Any]]
+
 
 # --- Core Task -------------------------------------------------------------
 class TaskRunner:
@@ -50,12 +55,7 @@ class TaskRunner:
 
     async def _set_state(self, state: TaskState, **meta) -> None:
         self.state = state
-        await event_bus.emit({
-            "type": "task",
-            "task": self,
-            "state": state,
-            **meta
-        })
+        await event_bus.emit({"type": "task", "task": self, "state": state, **meta})
 
     async def _execute_with_policies(self) -> Any:
         # Default: just execute once. Override or monkey-patch for retry/circuit.
@@ -80,9 +80,12 @@ class TaskRunner:
             await self._set_state(TaskState.FAILED, error=exc)
             raise
 
+
 # --- Sequence --------------------------------------------------------------
 class Sequence:
-    def __init__(self, *steps: Union[TaskRunner, 'Sequence', 'Parallel'], name: str = None):
+    def __init__(
+        self, *steps: Union[TaskRunner, "Sequence", "Parallel"], name: str = None
+    ):
         self.steps = steps
         self.name = name or "Sequence"
 
@@ -107,9 +110,15 @@ class Sequence:
                     result = await step.run()
         return result
 
+
 # --- Parallel --------------------------------------------------------------
 class Parallel:
-    def __init__(self, *jobs: Union[TaskRunner, Sequence, 'Parallel'], limit: int = None, name: str = None):
+    def __init__(
+        self,
+        *jobs: Union[TaskRunner, Sequence, "Parallel"],
+        limit: int = None,
+        name: str = None,
+    ):
         self.jobs = jobs
         self.limit = limit
         self.name = name or "Parallel"
@@ -117,9 +126,11 @@ class Parallel:
     async def run(self) -> list[Any]:
         if self.limit:
             sem = asyncio.Semaphore(self.limit)
+
             async def sem_job(job):
                 async with sem:
                     return await job.run()
+
             coros = [sem_job(job) for job in self.jobs]
         else:
             coros = [job.run() for job in self.jobs]
@@ -133,14 +144,19 @@ class Parallel:
             return results
         except Exception as exc:
             # Python 3.11+: Unwrap ExceptionGroup if only one exception
-            if sys.version_info >= (3, 11) and exc.__class__.__name__ == "ExceptionGroup":
+            if (
+                sys.version_info >= (3, 11)
+                and exc.__class__.__name__ == "ExceptionGroup"
+            ):
                 eg = exc
-                if hasattr(eg, 'exceptions') and len(eg.exceptions) == 1:
+                if hasattr(eg, "exceptions") and len(eg.exceptions) == 1:
                     raise eg.exceptions[0]
             raise
 
+
 # --- Circuit Breaker -------------------------------------------------------
 from aiobreaker import CircuitBreaker, CircuitBreakerError
+
 
 class CircuitGroup:
     class _EventListener:
@@ -148,34 +164,46 @@ class CircuitGroup:
             self.circuit_group = circuit_group
 
         async def state_change(self, breaker, old_state, new_state):
-            await event_bus.emit({
-                "type": "circuit",
-                "circuit": self.circuit_group,
-                "old_state": old_state,
-                "new_state": new_state
-            })
+            await event_bus.emit(
+                {
+                    "type": "circuit",
+                    "circuit": self.circuit_group,
+                    "old_state": old_state,
+                    "new_state": new_state,
+                }
+            )
 
         def before_call(self, breaker, func, *args, **kwargs):
             pass
+
         def failure(self, breaker, exc):
             pass
+
         def success(self, breaker):
             pass
+
         def call(self, breaker, func, *args, **kwargs):
             pass
+
         def open(self, breaker):
             pass
+
         def half_open(self, breaker):
             pass
+
         def close(self, breaker):
             pass
 
-    def __init__(self, *tasks: Union[TaskRunner, Sequence, Parallel],
-                 fail_max: int = 5, reset_timeout: int = 60,
-                 name: str = None):
+    def __init__(
+        self,
+        *tasks: Union[TaskRunner, Sequence, Parallel],
+        fail_max: int = 5,
+        reset_timeout: int = 60,
+        name: str = None,
+    ):
         self.tasks = tasks
         self.breaker = CircuitBreaker(fail_max=fail_max)
-        self.breaker.reset_timeout = reset_timeout # Set as a property
+        self.breaker.reset_timeout = reset_timeout  # Set as a property
         self.name = name or "CircuitGroup"
 
         # Subscribe to breaker state changes using aiobreaker's listener system
@@ -195,13 +223,11 @@ class CircuitGroup:
             return await self.breaker.call_async(Parallel(*self.tasks).run)
         except CircuitBreakerError as cbe:
             # Immediately fail
-            await event_bus.emit({
-                "type": "circuit",
-                "circuit": self,
-                "state": "OPEN",
-                "error": cbe
-            })
+            await event_bus.emit(
+                {"type": "circuit", "circuit": self, "state": "OPEN", "error": cbe}
+            )
             raise
+
 
 # --- Convenience Entrypoint -----------------------------------------------
 async def run(task: Union[TaskRunner, Sequence, Parallel, CircuitGroup]) -> Any:
