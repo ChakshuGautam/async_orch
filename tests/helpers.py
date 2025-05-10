@@ -2,10 +2,11 @@ import asyncio
 import random
 import backoff
 from async_orch import (
-    TaskRunner,
+    _TaskRunner, # Changed from TaskRunner
     Sequence,
     Parallel,
-    CircuitGroup,
+    CircuitDefinition, # Changed from CircuitGroup
+    run, # Added global run
     event_bus as global_event_bus,
     TaskState,
 )
@@ -59,7 +60,7 @@ def flaky_task_func():
 
 # Helper to create a flaky task with retry policy
 def create_flaky_task_with_retry(name="FlakyTaskWithRetry", max_tries=3):
-    task_flaky = TaskRunner(flaky_task_func, name=name)
+    task_flaky = _TaskRunner(flaky_task_func, name=name) # Changed to _TaskRunner
 
     # Monkey-patch retry policy (as in original example)
     def retry_policy_for_task(fn_to_wrap, task_instance):
@@ -77,7 +78,7 @@ def create_flaky_task_with_retry(name="FlakyTaskWithRetry", max_tries=3):
             backoff.expo,
             Exception,
             max_tries=max_tries,
-            on_backoff=lambda details: asyncio.create_task(on_backoff_handler(details)),
+            on_backoff=on_backoff_handler,
         )
         async def wrapped_execute_with_policies():
             return await fn_to_wrap()

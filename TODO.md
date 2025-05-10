@@ -9,11 +9,11 @@
 
 ## Terminology and Role Names
 - [x] Consolidate terminology and role names (e.g., use "task" consistently instead of mixing "job" or "activity").
-- [ ] Rename runner classes consistently (e.g., `SequentialTaskRunner` instead of `SequentialTaskRun`).
-- [ ] Refactor `Sequence` and `Parallel` to accept raw callable functions directly, potentially making `TaskRunner` an internal implementation detail.
+- [x] Rename runner classes consistently (e.g., `SequentialTaskRunner` instead of `SequentialTaskRun`).
+- [x] Refactor `Sequence` and `Parallel` to accept raw callable functions directly, potentially making `TaskRunner` an internal implementation detail.
 
 ## Abbreviations
-- [ ] Avoid unclear abbreviations (e.g., `thr` to `thread` or `executor`, `ctx` to `context`, `conf` to `config`).
+- [x] Avoid unclear abbreviations (e.g., `thr` to `thread` or `executor`, `ctx` to `context`, `conf` to `config`).
 
 ## Public API Methods and Signatures
 - [ ] Align task handles with Python Future API (e.g., `.result()` instead of `.get_result()`, `.cancel()` instead of `.stop()`, `.done()` or `.running()` instead of `.is_running()`).

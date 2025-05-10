@@ -9,10 +9,10 @@
 ## Key Features
 
 - **Asynchronous by Design**: Leverages `asyncio` for efficient I/O-bound operations and concurrency.
-- **Composability**: Build complex workflows by nesting `TaskRunner`, `Sequence`, `Parallel`, and `CircuitGroup` components.
-- **State Management & Observability**: A global `EventBus` allows for monitoring TaskRunner states and circuit breaker events.
-- **Resilience Patterns**: Includes `CircuitGroup` for circuit breaker functionality (using `aiobreaker`).
-- **Extensible Policies**: Customize TaskRunner execution with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
+- **Composability**: Build complex workflows by nesting `Sequence`, `Parallel`, and `CircuitDefinition` components.
+- **State Management & Observability**: A global `EventBus` allows for monitoring task states and circuit breaker events.
+- **Resilience Patterns**: Includes `CircuitDefinition` for circuit breaker functionality (using `aiobreaker`).
+- **Extensible Policies**: Tasks can be wrapped with retry mechanisms or other strategies (e.g., using `backoff` as shown in examples).
 
 ## Installation
 
@@ -30,7 +30,7 @@ Here's a simple example of defining and running a sequence of tasks:
 
 ```python
 import asyncio
-from async_orch import TaskRunner, Sequence, run
+from async_orch import Sequence, run # TaskRunner is now internal
 
 # Define some tasks
 async def fetch_user_data(user_id: int) -> dict:
@@ -38,31 +38,28 @@ async def fetch_user_data(user_id: int) -> dict:
     await asyncio.sleep(0.1) # Simulate I/O
     return {"id": user_id, "name": f"User {user_id}", "status": "active"}
 
-def process_user_data(data: dict) -> dict:
+def process_and_notify(data: dict) -> dict: # Combined for simplicity in example
     print(f"Processing data for {data['name']}...")
     data["processed"] = True
-    return data
-
-async def notify_user(data: dict):
     print(f"Notifying {data['name']} about processing completion...")
-    await asyncio.sleep(0.05) # Simulate I/O
+    # await asyncio.sleep(0.05) # If this part were async
     print(f"Notification sent for {data['name']}.")
+    return data # Return the processed data
 
-# Create a pipeline
+# Create a pipeline using the new API
 user_pipeline = Sequence(
-    TaskRunner(fetch_user_data, 101, name="FetchUserData"),
-    TaskRunner(process_user_data, name="ProcessUserData"), # Takes output from previous task
-    TaskRunner(notify_user, name="NotifyUser")            # Takes output from previous task
+    lambda: fetch_user_data(101), # Use lambda to pass arguments to the first task
+    process_and_notify,           # Receives output from fetch_user_data
+    name="UserProfileWorkflow"    # Optional name for the sequence
 )
 
 async def main():
     print("Starting user pipeline...")
-    results = await run(user_pipeline)
+    # The 'run' function executes the sequence and returns the result of the last task.
+    final_data = await run(user_pipeline)
     print("\nPipeline completed.")
-    if results and len(results) > 1:
-        final_data = results[1] # Result from process_user_data
+    if final_data:
         print(f"Final processed data from pipeline: {final_data}")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -74,7 +71,7 @@ For detailed information on all components, advanced usage, and more examples, p
 
 The wiki covers:
 
-- Core Components: `TaskRunner`, `EventBus`, `Sequence`, `Parallel`, `CircuitGroup`, `TaskState`.
+- Core Components: `Sequence`, `Parallel`, `CircuitDefinition`, `EventBus`, `TaskState`.
 - Advanced Patterns: Implementing retries, using the event bus for logging.
 - Codebase structure and how to run the bundled examples.
 

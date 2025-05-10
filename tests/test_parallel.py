@@ -1,46 +1,45 @@
 import pytest
-from async_orch import TaskRunner, Parallel
+from async_orch import Parallel, run # Import global run
 from tests.helpers import fetch_data
 
 
 @pytest.mark.asyncio
 async def test_simple_parallel_execution():
     """
-    Tests parallel execution of tasks.
-    Corresponds to example_simple_parallel.
+    Tests parallel execution of tasks using the new definition API.
     """
-    parallel_flow = Parallel(
-        TaskRunner(fetch_data, 10, name="Fetch10"),
-        TaskRunner(fetch_data, 20, name="Fetch20"),
-        TaskRunner(fetch_data, 30, name="Fetch30"),
-        max_workers=2,  # As in original example
+    # Define parallel tasks using raw functions (or lambdas for arguments)
+    parallel_def = Parallel(
+        lambda: fetch_data(10),
+        lambda: fetch_data(20),
+        lambda: fetch_data(30),
+        max_workers=2,
         name="TestSimpleParallel",
     )
-    results = await parallel_flow.run()
+    # Execute using the global run function
+    results = await run(parallel_def)
 
     assert len(results) == 3
     expected_results = ["data_10", "data_20", "data_30"]
-    # Results from Parallel might not be in order, so check for presence
     for item in expected_results:
         assert item in results
-
-    # To check if limit=2 was respected, we'd need to inspect timing or events,
-    # which is more complex. For now, this test focuses on correctness of results.
 
 
 @pytest.mark.asyncio
 async def test_parallel_with_empty_tasks():
-    """Tests Parallel flow with no tasks."""
-    parallel_flow = Parallel(name="TestEmptyParallel")
-    results = await parallel_flow.run()
+    """Tests Parallel flow with no tasks using the new definition API."""
+    empty_parallel_def = Parallel(name="TestEmptyParallel")
+    results = await run(empty_parallel_def)
     assert results == []
 
 
 @pytest.mark.asyncio
 async def test_parallel_with_one_task():
-    """Tests Parallel flow with a single task."""
-    parallel_flow = Parallel(
-        TaskRunner(fetch_data, 1, name="FetchSingle"), name="TestSingleTaskParallel"
+    """Tests Parallel flow with a single task using the new definition API."""
+    single_task_parallel_def = Parallel(
+        lambda: fetch_data(1), # Use lambda for args
+        name="TestSingleTaskParallel"
     )
-    results = await parallel_flow.run()
+    results = await run(single_task_parallel_def)
+    # Parallel always returns a list of results, even for one task.
     assert results == ["data_1"]

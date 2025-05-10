@@ -8,11 +8,9 @@
 
 The library revolves around a few key components:
 
-- **`TaskRunner`**: The fundamental unit of work.
-
-  - It can wrap both synchronous (`def`) and asynchronous (`async def`) functions.
-  - Each task maintains its state, tracked by the `TaskState` enum (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `RETRYING`, `CANCELLED`).
-  - State transitions and results/errors are typically communicated via the `EventBus`.
+- **Tasks (Functions)**: The fundamental units of work are now regular Python functions (sync or async). The library internally wraps these in an execution mechanism when they are part of a `Sequence`, `Parallel`, or `CircuitDefinition`.
+  - The internal runner handles state tracking (`TaskState`: `PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `RETRYING`, `CANCELLED`).
+  - State transitions and results/errors are communicated via the `EventBus`.
 
 - **`EventBus`**:
 
@@ -22,19 +20,20 @@ The library revolves around a few key components:
 
 - **`Sequence`**:
 
-  - A composite task that executes a series of steps (TaskRunners, other Sequences, or Parallels) one after another.
+  - A composite structure that executes a series of steps (functions, other Sequences, or Parallels) one after another.
+  - The output of one step is passed as input to the next, if the next step's function accepts arguments.
   - If any step fails, the sequence typically stops and propagates the error.
-  - Returns an ordered list of results from each successfully completed step.
+  - Returns the result of the last successfully completed step in the sequence.
 
 - **`Parallel`**:
 
-  - A composite task that executes multiple jobs (TaskRunners, Sequences, or other Parallels) concurrently.
-  - Supports an optional `limit` parameter to control the maximum number of jobs running at the same time.
-  - Waits for all jobs to complete and returns a list of their results. The order of results corresponds to the order of jobs defined.
+  - A composite structure that executes multiple tasks (functions, Sequences, or other Parallels) concurrently.
+  - Supports an optional `max_workers` parameter to control the maximum number of tasks running at the same time.
+  - Waits for all tasks to complete and returns a list of their results. The order of results corresponds to the order of tasks defined.
 
-- **`CircuitGroup`**:
+- **`CircuitDefinition`**: (Replaces `CircuitGroup`)
 
-  - A specialized composite that wraps one or more TaskRunners (or Sequences/Parallels) with a circuit breaker pattern, utilizing the `aiobreaker` library.
+  - A definition that wraps one or more tasks (functions, Sequences, or Parallels, typically run as a parallel group internally) with a circuit breaker pattern, utilizing the `aiobreaker` library.
   - Helps prevent repeated calls to services or tasks that are failing.
   - Monitors failures and "opens" the circuit if the failure threshold (`fail_max`) is reached within a certain time, preventing further calls for a `reset_timeout` period.
   - Emits events for circuit state changes (e.g., `OPEN`, `CLOSED`, `HALF_OPEN`).
@@ -51,146 +50,139 @@ The library revolves around a few key components:
 ## 3. Key Features
 
 - **Asynchronous by Design**: Built on Python's `asyncio` library, enabling efficient handling of I/O-bound operations and concurrent task execution.
-- **Composability**: TaskRunners and composite structures (`Sequence`, `Parallel`, `CircuitGroup`) can be nested to create complex and sophisticated workflows.
-- **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of TaskRunners and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
-- **Extensible Execution Policies**: The `TaskRunner._execute_with_policies` method is designed to be overridden or monkey-patched. This allows for the integration of custom behaviors such as retry mechanisms (as demonstrated in `examples/example.py` using the `backoff` library) or other advanced execution strategies.
+- **Composability**: Composite structures (`Sequence`, `Parallel`, `CircuitDefinition`) can be nested to create complex and sophisticated workflows.
+- **State Management & Observability**: The `EventBus` provides a centralized way to monitor the state and progress of individual tasks (via internal runners) and circuit breakers, facilitating logging, metrics collection, and real-time feedback.
+- **Extensible Execution Policies**: While `TaskRunner` is internal, the concept of applying policies like retries still exists. This is typically done by wrapping the task function itself (e.g., with a decorator like `backoff`) before passing it to a `Sequence`, `Parallel`, or `CircuitDefinition`.
 
 ## 4. How to Use (Illustrated with examples from `examples/example.py`)
 
-### Defining Basic Tasks
+### Defining Basic Tasks (Functions)
 
-Tasks can wrap either asynchronous or synchronous functions.
+Tasks are now just Python functions. Arguments are passed using lambdas for the first task in a sequence or for all tasks in a parallel group if they don't depend on prior outputs.
 
 ```python
-# From examples/example.py
-from async_orch import TaskRunner
 import asyncio
 
 # Asynchronous task
-async def fetch_data(id):
+async def fetch_data(id_val: int): # Renamed id to id_val to avoid conflict
     await asyncio.sleep(0.5)
-    return f"data_{id}"
-
-task_fetch = TaskRunner(fetch_data, 1)
+    return f"data_{id_val}"
 
 # Synchronous task
-def process_data(data):
+def process_data(data: str) -> str:
     return data.upper()
-
-task_process = TaskRunner(process_data, "some_data")
 ```
 
 ### Creating a `Sequence`
 
-Execute tasks one after another.
+Execute functions one after another. The output of one is passed to the next.
 
 ```python
-# From examples/example.py
-from async_orch import TaskRunner, Sequence, event_bus, TaskState # Assuming fetch_data, process_data, save_data are defined
+from async_orch import Sequence, run 
 # ... (fetch_data, process_data, save_data definitions) ...
 
-nested_pipeline = Sequence(
-    TaskRunner(fetch_data, 1, name="Fetch1"),
-    TaskRunner(process_data, name="Process1"), # process_data is sync
-    TaskRunner(save_data, name="Save1"),      # save_data is sync
-    name="NestedPipeline"
+# Assume save_data is defined:
+# async def save_data(data_to_save: str): print(f"Saving {data_to_save}")
+
+user_profile_pipeline = Sequence(
+    lambda: fetch_data(101),    # First task with arguments via lambda
+    process_data,               # Receives output of fetch_data
+    # save_data,                # Receives output of process_data
+    name="UserProfileWorkflow"
 )
 
 # To run:
-# await nested_pipeline.run()
+# result_of_last_task = await run(user_profile_pipeline)
 ```
 
 ### Creating a `Parallel` Execution
 
-Execute tasks concurrently, optionally limiting concurrency.
+Execute functions concurrently, optionally limiting concurrency.
 
 ```python
-# From examples/example.py
-from async_orch import TaskRunner, Parallel # Assuming fetch_data is defined
+from async_orch import Parallel, run 
 # ... (fetch_data definition) ...
 
-results = await Parallel(
-    TaskRunner(fetch_data, 10),
-    TaskRunner(fetch_data, 20),
-    TaskRunner(fetch_data, 30),
-    limit=2, # Optional: Max 2 tasks run at once
-    name="SimpleParallel"
-).run()
-# results will be: ['data_10', 'data_20', 'data_30'] (order maintained)
+parallel_fetch = Parallel(
+    lambda: fetch_data(10),
+    lambda: fetch_data(20),
+    lambda: fetch_data(30),
+    max_workers=2, # Optional: Max 2 tasks run at once
+    name="SimpleParallelFetch"
+)
+# To run:
+# results_list = await run(parallel_fetch)
+# results_list will be: ['data_10', 'data_20', 'data_30'] (order maintained)
 ```
 
 ### Implementing Retries
 
-The `TaskRunner._execute_with_policies` method can be enhanced for retries. `examples/example.py` demonstrates this by monkey-patching with the `backoff` library.
+Retries are typically implemented by wrapping the task function itself, for example, using a library like `backoff`.
 
 ```python
-# From examples/example.py (simplified)
-from async_orch import TaskRunner, TaskState, event_bus # Assuming flaky_task is defined
+from async_orch import Sequence, run, event_bus, TaskState # TaskState for event logging
 import backoff
 import asyncio
 
-# ... (flaky_task definition) ...
-task_flaky = TaskRunner(flaky_task, name="Flaky")
+# Example flaky task
+async def flaky_task():
+    if asyncio.shield(asyncio.sleep(0)): # Dummy condition
+        raise ValueError("Simulated network error")
+    return "Success!"
 
-def retry_policy(fn_to_wrap, task_instance):
-    async def on_backoff_handler(details):
-        await event_bus.emit({
-            "type": "task",
-            "task": task_instance,
-            "state": TaskState.RETRYING,
-            **details
-        })
+# Event handler for retries (optional, for logging)
+async def on_retry_event(details):
+    # Note: 'task' in event will be an internal runner instance.
+    # You might need to map it back to your original function if needed for logging.
+    print(f"RETRYING: Task {details.get('target', {}).__name__}, attempt {details.get('tries')}, waiting {details.get('wait'):.2f}s")
+    # Emitting a custom event or using event_bus if the internal runner emits retry events
+    # await event_bus.emit(...) # If you want to use the main event bus
 
-    # This wraps the original _execute_with_policies method
-    @backoff.on_exception(
-        backoff.expo,
-        Exception,
-        max_tries=3,
-        on_backoff=lambda details: asyncio.create_task(on_backoff_handler(details))
-    )
-    async def wrapped_execute_with_policies():
-        return await fn_to_wrap() # Calls the original method logic
+@backoff.on_exception(
+    backoff.expo,
+    Exception, # Catch all exceptions for retry
+    max_tries=3,
+    on_backoff=lambda details: asyncio.create_task(on_retry_event(details)) # Ensure handler is async if it awaits
+)
+async def flaky_task_with_retry():
+    return await flaky_task()
 
-    return wrapped_execute_with_policies
-
-# Apply the retry policy
-original_execute_policies = task_flaky._execute_with_policies
-task_flaky._execute_with_policies = retry_policy(original_execute_policies, task_flaky)
-
+# Use the wrapped task in a sequence
+retry_pipeline = Sequence(flaky_task_with_retry, name="RetryFlaky")
 
 # To run:
 # try:
-#     result = await task_flaky.run()
+#     result = await run(retry_pipeline)
 # except Exception as e:
 #     print(f"Flaky task ultimately failed: {e}")
 ```
 
-### Using `CircuitGroup`
+### Using `CircuitDefinition`
 
 Protect your system from cascading failures.
 
 ```python
-# From examples/example.py
-from async_orch import TaskRunner, CircuitGroup # Assuming fetch_data, process_data are defined
+from async_orch import CircuitDefinition, run # Assuming fetch_data, process_data are defined
 # ... (fetch_data, process_data definitions) ...
 
-breaker_group = CircuitGroup(
-    TaskRunner(fetch_data, 2, name="Fetch2"),
-    TaskRunner(process_data, name="Process2"), # Assuming process_data can also fail
+# Tasks for the circuit breaker are defined as a list/tuple.
+# They will typically run in parallel under the breaker.
+circuit_protected_tasks = CircuitDefinition(
+    lambda: fetch_data(201),
+    lambda: process_data("raw_circuit_data"), # Example independent task
     fail_max=2,        # Open circuit after 2 failures
     reset_timeout=10,  # Try to close circuit after 10 seconds
-    name="CircuitDemo"
+    name="DemoCircuit"
 )
 
 # To run:
 # from aiobreaker import CircuitBreakerError # Import for catching specific error
 # try:
-#     await breaker_group.run()
+#     results = await run(circuit_protected_tasks) # Returns a list of results if successful
 # except CircuitBreakerError as e:
 #     print(f"Circuit breaker triggered: {e}")
 # except Exception as e:
-#     print(f"Other error in breaker group: {e}")
-
+#     print(f"Other error in circuit protected tasks: {e}")
 ```
 
 ### Subscribing to the `EventBus`
@@ -210,22 +202,22 @@ async def log_event(event): # Made async to match EventBus.emit
 event_bus.subscribe(lambda e: asyncio.create_task(log_event(e)))
 ```
 
-When a task changes state, an event like this might be emitted:
-`{'type': 'task', 'task': <TaskRunner Fetch1>, 'state': TaskState.RUNNING}`
-`{'type': 'task', 'task': <TaskRunner Fetch1>, 'state': TaskState.SUCCEEDED, 'result': 'data_1'}`
+When a task changes state, an event like this might be emitted (note: `task` refers to an internal runner object):
+`{'type': 'task', 'task': <async_orch._TaskRunner object at ...>, 'state': TaskState.RUNNING}`
+`{'type': 'task', 'task': <async_orch._TaskRunner object at ...>, 'state': TaskState.SUCCEEDED, 'result': 'data_1'}`
 
-For circuit breakers:
-`{'type': 'circuit', 'circuit': <CircuitGroup CircuitDemo>, 'old_state': <CircuitBreakerState.CLOSED: 'closed'>, 'new_state': <CircuitBreakerState.OPEN: 'open'>}`
+For circuit breakers (using `CircuitDefinition`):
+`{'type': 'circuit', 'circuit_definition_name': 'DemoCircuit', 'old_state': 'CLOSED', 'new_state': 'OPEN'}` (State names are strings)
 
 ### Top-level Runner
 
-The `async_orch.run()` function provides a convenient way to execute any top-level TaskRunner, sequence, parallel group, or circuit group.
+The `async_orch.run()` function provides a convenient way to execute any top-level `Sequence`, `Parallel`, or `CircuitDefinition`.
 
 ```python
-import async_orch
+from async_orch import run
 
-# Assuming 'my_main_workflow' is a TaskRunner, Sequence, Parallel, or CircuitGroup instance
-# await async_orch.run(my_main_workflow)
+# Assuming 'my_main_workflow' is a Sequence, Parallel, or CircuitDefinition instance
+# await run(my_main_workflow)
 ```
 
 ## 5. Codebase Structure
@@ -234,17 +226,17 @@ import async_orch
 
   - `EventBus`: Manages event subscriptions and emissions.
   - `TaskState`: Enum for task lifecycle states.
-  - `TaskRunner`: The basic execution unit.
-  - `Sequence`: For sequential execution of TaskRunners.
-  - `Parallel`: For concurrent execution of TaskRunners.
-  - `CircuitGroup`: Implements the circuit breaker pattern for a group of tasks.
+  - `Sequence`: For sequential execution of tasks/definitions.
+  - `Parallel`: For concurrent execution of tasks/definitions.
+  - `CircuitDefinition`: Defines a group of tasks protected by a circuit breaker.
   - `run()`: A top-level convenience function to execute any workflow component.
+  - Internal classes like `_TaskRunner`, `_SequentialTaskRunner`, `_ParallelTaskRunner`, `_CircuitGroupTaskRunner` handle the actual execution logic.
 
 - **`examples/example.py`**: This file provides practical usage examples of the `async_orch` library. It demonstrates:
-  - Defining various types of tasks (I/O-bound, CPU-bound-like).
-  - Constructing sequences and parallel groups.
-  - Implementing a retry mechanism for a flaky task.
-  - Using a circuit breaker.
+  - Defining various types of task functions.
+  - Constructing sequences and parallel groups using the new API.
+  - Implementing a retry mechanism for a flaky task using `backoff`.
+  - Using a `CircuitDefinition`.
   - Subscribing to the event bus for logging.
   - Running a mixed pipeline of sequences and parallel groups.
 

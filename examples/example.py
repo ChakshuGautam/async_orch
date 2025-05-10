@@ -1,159 +1,187 @@
 from async_orch import (
-    TaskRunner,
     Sequence,
     Parallel,
-    CircuitGroup,
+    CircuitDefinition,
     event_bus,
     TaskState,
+    run,  # Import the global run function
+    # _TaskRunner no longer needed for examples
 )
 import asyncio
+import backoff # Keep for retry example
 
 
 # Subscribe a simple logger to event bus
-async def log_event(event):  # Made async as per wiki.md suggestion for event_bus
-    print(f"EVENT: {event}")
+async def log_event(event):
+    # For task events, 'task' is an internal _TaskRunner instance.
+    # We can try to get its configured name for better logging.
+    if event.get("type") == "task" and hasattr(event.get("task"), "name"):
+        event_copy = event.copy()
+        event_copy["task_name"] = event["task"].name
+        del event_copy["task"] # Remove the object itself for cleaner log
+        print(f"EVENT: {event_copy}")
+    else:
+        print(f"EVENT: {event}")
 
 
+# Ensure event_bus.subscribe is called correctly
+# The lambda now directly calls the async log_event
 event_bus.subscribe(lambda e: asyncio.create_task(log_event(e)))
 
 
-# --- Task Definitions -----------------------------------------------------
+# --- Task Definitions (Functions) -----------------------------------------
 # 1. Simple I/O Task: fetch data (simulated)
-async def fetch_data(id):
+async def fetch_data(id_val): # Renamed id to id_val to avoid conflict with built-in
     await asyncio.sleep(0.5)
-    return f"data_{id}"
+    return f"data_{id_val}"
 
 
 # 2. CPU-bound-like Task: process data (sync)
 def process_data(data):
-    # pretend heavy compute
     return data.upper()
 
 
-# 3. Nested Pipeline Task: load, process, and save
-def save_data(processed):
-    print(f"Saved: {processed}")
+# 3. Task for saving data
+def save_data(processed_data): # Renamed processed to processed_data
+    print(f"Saved: {processed_data}")
 
 
-nested_pipeline = Sequence(
-    TaskRunner(fetch_data, 1, name="Fetch1"),
-    TaskRunner(process_data, name="Process1"),
-    TaskRunner(save_data, name="Save1"),
+# --- Composed Definitions -------------------------------------------------
+
+# Nested Pipeline Definition
+# Users now define sequences with raw functions or other definitions.
+# Names for individual function steps can be set on _TaskRunner if needed,
+# but the primary API encourages naming the Sequence/Parallel/CircuitDefinition.
+nested_pipeline_def = Sequence(
+    lambda: fetch_data(1), # Use lambdas or functools.partial for args
+    process_data,
+    save_data,
     name="NestedPipeline",
 )
 
 
-# 4. Failing Task for Retry Demo
+# Flaky Task for Retry Demo
 def flaky_task():
     import random
-
     if random.random() < 0.7:
         raise RuntimeError("Flaky failure!")
     return "flaky_success"
 
+# Flaky Task for Retry Demo
+# Original flaky_task definition remains the same.
+# The retry logic is now applied directly via a decorator.
 
-task_flaky = TaskRunner(flaky_task, name="Flaky")
-# Monkey-patch retry policy
-import backoff
-from async_orch import TaskState  # Corrected import
-
-
-def retry_policy(
-    fn_to_wrap, task_instance
-):  # Added task_instance for better event emitting
-    async def on_backoff_handler(details):
-        await event_bus.emit(
-            {
-                "type": "task",
-                "task": task_instance,  # Use task_instance
-                "state": TaskState.RETRYING,
-                **details,
-            }
-        )
-
-    @backoff.on_exception(
-        backoff.expo,
-        Exception,
-        max_tries=3,
-        on_backoff=lambda details: asyncio.create_task(on_backoff_handler(details)),
+async def on_retry_handler(details):
+    """Event handler for backoff to log retries."""
+    # We don't have a direct _TaskRunner instance here in the new API style.
+    # The event_bus will log RUNNING, FAILED states from the internal runner.
+    # This handler is specific to backoff's retry attempt.
+    print(
+        f"BACKOFF: Retrying {details['target'].__name__} "
+        f"after {details['tries']} tries, "
+        f"sleeping {details['wait']:.2f}s. "
+        f"Error: {details['exception']}"
     )
-    async def wrapped_execute_with_policies():
-        return await fn_to_wrap()
+    # If we want to emit a TaskState.RETRYING event, we'd need more context
+    # or a way to signal the internal runner. For now, simple print.
 
-    return wrapped_execute_with_policies
+@backoff.on_exception(
+    backoff.expo,
+    Exception,  # Catch all exceptions for retry
+    max_tries=3,
+    on_backoff=on_retry_handler # Pass the async handler directly
+)
+async def flaky_task_with_retry(): # Renamed to reflect it's already wrapped
+    import random
+    if random.random() < 0.7:
+        raise RuntimeError("Flaky failure!")
+    return "flaky_success_from_decorated_task"
 
 
-original_execute_policies = task_flaky._execute_with_policies
-task_flaky._execute_with_policies = retry_policy(original_execute_policies, task_flaky)
-
-
-# 5. Circuit Breaker Group Demo
-breaker_group = CircuitGroup(
-    TaskRunner(fetch_data, 2, name="Fetch2"),
-    TaskRunner(process_data, name="Process2"),
+# Circuit Breaker Definition
+# Define tasks to be run under circuit breaker.
+# CircuitDefinition internally runs its tasks as a Parallel group.
+# These tasks will run in parallel. If one fails repeatedly, the circuit opens for all.
+circuit_def_final = CircuitDefinition(
+    lambda: fetch_data(21), # task 1 for circuit
+    lambda: fetch_data(22), # task 2 for circuit
+    name="CircuitDemo",
     fail_max=2,
     reset_timeout=10,
-    name="CircuitDemo",
 )
 
 
 # --- Examples -------------------------------------------------------------
 async def example_simple_parallel():
     print("Example 1: Simple Parallel Execution")
-    results = await Parallel(
-        TaskRunner(fetch_data, 10),
-        TaskRunner(fetch_data, 20),
-        TaskRunner(fetch_data, 30),
+    # Define parallel tasks using raw functions (or lambdas for arguments)
+    parallel_def = Parallel(
+        lambda: fetch_data(10),
+        lambda: fetch_data(20),
+        lambda: fetch_data(30),
         max_workers=2,
         name="SimpleParallel",
-    ).run()
+    )
+    results = await run(parallel_def) # Use the global run function
     print("Results:", results)
 
 
 async def example_nested_sequence():
     print("Example 2: Nested Sequence (pipeline)")
-    await nested_pipeline.run()
+    # nested_pipeline_def is already defined
+    await run(nested_pipeline_def) # Use the global run function
 
 
 async def example_retry_flaky():
-    print("Example 3: Retry on Flaky Task")
+    print("Example 3: Retry on Flaky Task (using decorated function)")
+    # Define a sequence using the decorated flaky_task_with_retry
+    retry_def = Sequence(flaky_task_with_retry, name="FlakyTaskSequence")
     try:
-        result = await task_flaky.run()
-        print("Flaky result:", result)
+        result = await run(retry_def)
+        print("Flaky task with retry result:", result)
     except Exception as e:
-        print("Flaky ultimately failed", e)
+        print("Flaky task with retry ultimately failed:", e)
 
 
 async def example_circuit_breaker():
     print("Example 4: Circuit Breaker Demo")
+    # circuit_def_final is the definition
     for i in range(5):
         try:
             print(f"Circuit attempt {i+1}")
-            await breaker_group.run()
+            # Run the CircuitDefinition
+            await run(circuit_def_final)
             print("Circuit group succeeded.")
         except Exception as e:
             print(f"Circuit attempt {i+1} failed: {e}")
-            if "OPEN" in str(e) or "CircuitBreakerError" in str(e.__class__):
-                print("Circuit is OPEN.")
+            # Check for CircuitBreakerError specifically if possible
+            # The event bus will also log state changes.
+            if "OPEN" in str(e) or "CircuitBreakerError" in str(e.__class__.__name__):
+                 print("Circuit is OPEN.")
         await asyncio.sleep(1)
 
 
 async def example_mixed_pipeline():
     print("Example 5: Mixed Sequence & Parallel")
 
-    pipeline = Sequence(
-        TaskRunner(fetch_data, 100, name="Fetch100"),
+    # Define the mixed pipeline using Sequence and Parallel definitions
+    mixed_pipeline_def = Sequence(
+        lambda: fetch_data(100),
         Parallel(
-            TaskRunner(process_data, "alpha", name="ProcessAlpha"),
-            TaskRunner(process_data, "beta", name="ProcessBeta"),
-            name="ProcessParallel",
+            lambda: process_data("alpha_from_mixed"), # Needs input or be self-contained
+            lambda: process_data("beta_from_mixed"),  # Needs input or be self-contained
+            name="ProcessParallelMixed",
         ),
-        TaskRunner(
-            save_data, "Mixed pipeline processed data saved.", name="SaveMixedSummary"
-        ),
+        # The save_data function expects input.
+        # The Parallel block above returns a list of results.
+        # We need to adapt how save_data is called or what it receives.
+        # For simplicity, let's assume save_data can handle a list or we modify it.
+        # Or, more realistically, one might process the list from Parallel before saving.
+        # Let's make a simple summary save.
+        lambda results_list: save_data(f"Mixed pipeline summary: {results_list}"),
         name="MixedPipeline",
     )
-    await pipeline.run()
+    await run(mixed_pipeline_def)
 
 
 # --- Run All Examples -----------------------------------------------------
