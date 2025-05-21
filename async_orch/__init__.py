@@ -218,32 +218,51 @@ class _ParallelTaskRunner:
         else:
             coroutines = [ex.run() for ex in self._executable_tasks]
 
-        results = []
-        try:
-            async with asyncio.TaskGroup() as task_group:
-                tasks = [task_group.create_task(c) for c in coroutines]
-            for t in tasks:
-                results.append(t.result())
-            return results
-        except Exception as exc:
-            # Python 3.11+: Unwrap ExceptionGroup if only one exception
-            if (
-                sys.version_info >= (3, 11)
-                and exc.__class__.__name__ == "ExceptionGroup"
-            ):
-                exception_group = exc
-                if (
-                    hasattr(exception_group, "exceptions")
-                    and len(exception_group.exceptions) == 1
-                ):
-                    raise exception_group.exceptions[0]
-            raise
+        if not coroutines:
+            return []
+
+        if sys.version_info >= (3, 11):
+            results = []
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    tasks = [tg.create_task(coro) for coro in coroutines]
+                # Collect results from tasks after TaskGroup finishes
+                # Ensure tasks are complete and handle potential errors during result retrieval if necessary
+                for task in tasks:
+                    # If a task was cancelled, result() will raise CancelledError
+                    # If a task raised an exception, result() will raise that exception
+                    results.append(task.result())
+                return results
+            except ExceptionGroup as e:
+                # For TaskGroup, multiple exceptions can be raised in an ExceptionGroup.
+                # Propagate the first exception for consistency with gather, or handle as needed.
+                # This example re-raises the first exception.
+                if e.exceptions:
+                    raise e.exceptions[0]
+                else:
+                    # Should not happen if ExceptionGroup is raised
+                    raise RuntimeError("TaskGroup failed without specific exceptions")
+            except Exception as exc: # Catch other potential errors, though TaskGroup usually wraps in ExceptionGroup
+                raise exc
+        else:
+            # Python < 3.11 code using asyncio.gather
+            try:
+                # asyncio.gather will run all coroutines and return a list of their results.
+                # If any coroutine raises an exception, asyncio.gather will propagate that exception.
+                # Other coroutines will continue to run until completion or cancellation by gather.
+                results = await asyncio.gather(*coroutines)
+                return results
+            except Exception as e:
+                # asyncio.gather propagates the first exception it encounters.
+                # The other tasks are cancelled by gather itself.
+                raise e
 
 
 # --- Circuit Breaker Definition --------------------------------------------
 from aiobreaker import (
     CircuitBreaker,
     CircuitBreakerError,
+    CircuitBreakerState, # Import CircuitBreakerState
 )  # Keep import here for CircuitBreakerError
 
 
@@ -274,20 +293,22 @@ class _CircuitGroupTaskRunner:
             # Assuming breaker.current_state is the string name of the new state (e.g., "OPEN")
             # And old_state/new_state are objects without .name and unhelpful __str__
 
-            current_state_str = (
-                breaker.current_state
-            )  # This should be the string name of new_state
-
-            # For old_state, it's harder to get a clean string name if the object itself doesn't provide it.
-            # We'll use str() as a fallback for logging.
-            old_name_repr = str(old_state)
+            # Determine the CircuitBreakerState enum member from the new_state object (new_state_obj)
+            # new_state (the parameter) is an instance of a state class like CircuitOpenState, CircuitClosedState
+            current_enum_state = None
+            for enum_member in CircuitBreakerState: # Iterate through CircuitBreakerState enum
+                if isinstance(new_state, enum_member.value): # enum_member.value is the class type (e.g., <class 'aiobreaker.state.CircuitClosedState'>)
+                    current_enum_state = enum_member
+                    break
+            
+            old_name_repr = str(old_state) # Keep as string representation for simplicity
 
             event_payload = {
                 "type": "circuit",
                 "circuit_runner_name": self.circuit_runner.name,
                 "circuit_definition_name": self.circuit_runner.definition.name,
-                "old_state": old_name_repr,  # Log representation of old_state object
-                "new_state": current_state_str,  # Use string name from breaker for new_state
+                "old_state": old_name_repr,
+                "new_state": current_enum_state,  # Use the determined enum member
             }
             try:
                 loop = asyncio.get_running_loop()
